@@ -37,9 +37,18 @@ Any static file server works.
 
 Open `js/products.js` and change, add or remove entries. Each product has an `id` (used in the URL), `name`, `price` in EUR, `colors` for the drawing, an optional `tag`, a `description` and a `details` list. Shipping rates are at the top of `js/app.js`.
 
+## Tests
+
+`tests/smoke.js` clicks through the live site in a headless browser: shop, product page, add to cart, quantity changes, cart persistence, demo checkout and mobile layout. It runs automatically after every deploy (the `verify` job). To run it yourself:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium
+node tests/smoke.js https://propeleris07.github.io/LIAG-CAPS/
+```
+
 ## Deployment
 
-Every push to `main` runs `.github/workflows/deploy.yml`, which checks that the site files exist, copies them into `_site` and deploys with GitHub Pages.
+Every push to `main` runs `.github/workflows/deploy.yml`, which checks that the site files exist, copies them into `_site`, deploys with GitHub Pages, then smoke-tests the live site.
 
 One-time setting: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
