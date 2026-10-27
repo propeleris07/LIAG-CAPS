@@ -103,8 +103,11 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
 
   for (const [link, id] of [["About", "about"], ["Our story", "story"], ["Contact", "contact"]]) {
     await page.click(`header nav >> text=${link}`);
-    await page.waitForTimeout(600);
-    check(await page.evaluate((s) => Math.abs(document.getElementById(s).getBoundingClientRect().top) < 200, id), `${link} link scrolls to its section`);
+    // Smooth scrolling can take a moment on slow machines; wait for it to land.
+    const landed = await page
+      .waitForFunction((s) => Math.abs(document.getElementById(s).getBoundingClientRect().top) < 200, id, { timeout: 4000 })
+      .then(() => true, () => false);
+    check(landed, `${link} link scrolls to its section`);
   }
 
   // ---- cart page ----
