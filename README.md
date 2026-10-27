@@ -9,20 +9,22 @@ A storefront for caps with the slogan **“Lithuania is Already Great”**.
 
 ## What's inside
 
-Plain HTML, CSS and JavaScript. There are no dependencies and no build step.
+Plain HTML, CSS and JavaScript. There are no dependencies and no build step. The design follows the "Lithuania Is Already Great" layout: hero with colour switcher, "Not again. Already." manifesto, Drop 01 product grid, panel-block banner, How it works, and a contact form.
 
 ```
 index.html          Page shell (header, nav, footer)
 404.html            Sends unknown URLs back to the store
-css/style.css       All styling, mobile-friendly
-js/products.js      Product catalogue: names, prices, colours, descriptions
-js/app.js           Router (#/shop, #/product/<id>, #/cart, #/checkout), cart, demo checkout
-assets/favicon.svg  Lithuanian flag icon
+css/style.css       All styling (Anton + Inter fonts from Google Fonts), mobile-friendly
+js/products.js      The three caps (Sun, Hope, Courage), prices, bundle price, shipping rates
+js/app.js           Router, cart with bundle discount, demo checkout, contact form
+assets/img/         Cap photos and panel-block photos
+tests/smoke.js      Browser test run against the live site after every deploy
 .github/workflows/deploy.yml  Publishes to GitHub Pages on every push to main
 ```
 
-Pages use hash URLs (for example `#/product/classic-trispalve`), so every page works on GitHub Pages without server rules.
-The cart is saved in the visitor's browser (`localStorage`). Cap images are drawn as inline SVG from each product's colours, so there are no image files to manage.
+Pages use hash URLs (`#/caps`, `#/product/sun`, `#/cart`), so everything works on GitHub Pages without server rules. The cart is saved in the visitor's browser (`localStorage`).
+
+**Pricing:** €29 per cap. Every complete set of all three colours in the cart is charged €75 (a €12 discount). Shipping is a flat €4.90, free from €50. Change these in `js/products.js`.
 
 ## Run locally
 
@@ -31,11 +33,16 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Any static file server works.
-
 ## Edit products
 
-Open `js/products.js` and change, add or remove entries. Each product has an `id` (used in the URL), `name`, `price` in EUR, `colors` for the drawing, an optional `tag`, a `description` and a `details` list. Shipping rates are at the top of `js/app.js`.
+Open `js/products.js`. Each cap has an `id` (used in the URL), `name`, `color`, `swatch` colour, `price` in EUR, a full-size `image`, a smaller `thumb` and a `description`. Drop new photos into `assets/img/` and point the entries at them.
+
+## Still to fill in
+
+- **Contact details:** an email address and Instagram handle for the contact section.
+- **Contact form delivery:** the form currently only shows a thank-you message. Connect a form service (e.g. Formspree) or a mailto link.
+- **Drop size:** the number of caps per colour, if you want to show it.
+- **Looping video and founder section** from the design, once you have the video, photo and text.
 
 ## Tests
 
