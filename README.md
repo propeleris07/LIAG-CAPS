@@ -24,6 +24,10 @@ tests/smoke.js      Browser test run against the live site after every deploy
 
 Pages use hash URLs (`#/caps`, `#/product/sun`, `#/cart`), so everything works on GitHub Pages without server rules. The cart is saved in the visitor's browser (`localStorage`).
 
+**Live drop:** the countdown runs to `SHOP.drop.endsAt` in `js/products.js`; when it reaches zero, buying closes automatically. Each cap has `stock` (caps left) and `stockTotal` (drop size); the stock bars and "Only N left" labels come from those, so update `stock` as you sell. Visitors can hold at most `maxPerOrder` (10) of a cap and never more than what's left.
+
+**Cart:** adding a cap opens a slide-out cart with +/− quantity, typed quantities, remove (with Undo), a free-shipping progress bar and a one-click bundle suggestion. The full cart page is at `#/cart`.
+
 **Pricing:** €29 per cap. Every complete set of all three colours in the cart is charged €75 (a €12 discount). Shipping is a flat €4.90, free from €50. Change these in `js/products.js`.
 
 ## Run locally

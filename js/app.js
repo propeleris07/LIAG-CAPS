@@ -29,11 +29,12 @@
     return null;
   }
   var toastTimer;
-  function toast(msg) {
-    toastEl.textContent = msg;
+  function toast(msg, undo) {
+    toastEl.innerHTML = "<span>" + esc(msg) + "</span>" + (undo ? '<button type="button" class="toast-undo">Undo</button>' : "");
+    if (undo) toastEl.querySelector("button").onclick = function () { undo(); toastEl.classList.remove("show"); };
     toastEl.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2400);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, undo ? 5000 : 2400);
   }
   function capImg(p, cls, small) {
     return '<img class="' + (cls || "") + '" src="' + (small ? p.thumb : p.image) + '" alt="' +
@@ -54,18 +55,98 @@
   var cart = loadCart();
   function saveCart() {
     try { localStorage.setItem(CART_KEY, JSON.stringify(cart)); } catch (e) { /* private mode */ }
-    updateCount();
+    refresh();
   }
-  function updateCount() {
-    var n = cart.reduce(function (s, l) { return s + l.qty; }, 0);
-    countEl.textContent = n;
-    countEl.classList.toggle("has-items", n > 0);
+  function cartCount() {
+    return cart.reduce(function (s, l) { return s + l.qty; }, 0);
   }
+  function lineFor(id) {
+    return cart.filter(function (l) { return l.id === id; })[0];
+  }
+  function inCart(id) {
+    var l = lineFor(id);
+    return l ? l.qty : 0;
+  }
+  // Most a visitor can hold of one cap: what's left in the drop, capped per order.
+  function maxQty(p) {
+    return Math.max(0, Math.min(p.stock, SHOP.maxPerOrder));
+  }
+  function left(p) {
+    return Math.max(0, p.stock - inCart(p.id));
+  }
+  // Returns how many were actually added.
   function addToCart(id, qty) {
-    var line = cart.filter(function (l) { return l.id === id; })[0];
-    if (line) line.qty = Math.min(line.qty + qty, 20);
-    else cart.push({ id: id, qty: qty });
+    var p = findProduct(id);
+    var room = maxQty(p) - inCart(id);
+    var n = Math.max(0, Math.min(qty, room));
+    if (!n) return 0;
+    var line = lineFor(id);
+    if (line) line.qty += n;
+    else cart.push({ id: id, qty: n });
     saveCart();
+    return n;
+  }
+  function setQty(id, qty) {
+    var line = lineFor(id);
+    if (!line) return;
+    line.qty = Math.min(qty, maxQty(findProduct(id)));
+    if (line.qty < 1) cart.splice(cart.indexOf(line), 1);
+    saveCart();
+  }
+  function removeLine(id) {
+    var idx = cart.indexOf(lineFor(id));
+    if (idx < 0) return;
+    var removed = cart.splice(idx, 1)[0];
+    saveCart();
+    toast("Removed " + findProduct(id).name + " from cart", function () {
+      cart.splice(Math.min(idx, cart.length), 0, removed);
+      saveCart();
+    });
+  }
+
+  // ---------- live drop ----------
+  var dropEnds = new Date(SHOP.drop.endsAt).getTime();
+  function dropOpen() { return Date.now() < dropEnds; }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function countdownParts() {
+    var ms = Math.max(0, dropEnds - Date.now());
+    var sec = Math.floor(ms / 1000);
+    return { d: Math.floor(sec / 86400), h: Math.floor(sec % 86400 / 3600), m: Math.floor(sec % 3600 / 60), s: sec % 60 };
+  }
+  function countdownBoxes() {
+    return '<div class="countdown" data-countdown aria-label="Time left in the drop">' +
+      ["d", "h", "m", "s"].map(function (k) {
+        return '<div><span data-cd="' + k + '">00</span><small>' + { d: "days", h: "hours", m: "min", s: "sec" }[k] + "</small></div>";
+      }).join("") + "</div>";
+  }
+  function tick() {
+    var c = countdownParts();
+    document.querySelectorAll("[data-cd]").forEach(function (el) {
+      el.textContent = pad(c[el.getAttribute("data-cd")]);
+    });
+    document.querySelectorAll("[data-cd-inline]").forEach(function (el) {
+      el.textContent = c.d + "d " + pad(c.h) + ":" + pad(c.m) + ":" + pad(c.s);
+    });
+    if (!dropOpen() && !document.body.classList.contains("drop-closed")) {
+      document.body.classList.add("drop-closed");
+      refresh();
+    }
+  }
+  function stockLine(p) {
+    var l = left(p);
+    var pct = Math.round(100 * p.stock / p.stockTotal);
+    var label = !dropOpen() ? "Drop closed" : p.stock === 0 ? "Sold out" : p.stock <= 10 ? "Almost gone · " + p.stock + " left" : "Only " + p.stock + " of " + p.stockTotal + " left";
+    return '<div class="stockbar' + (p.stock <= 10 ? " low" : "") + '" data-stock="' + p.id + '">' +
+      '<p class="stock"><span class="dot live"></span>' + esc(label) + "</p>" +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+      (inCart(p.id) && dropOpen() ? '<p class="held">' + inCart(p.id) + " in your cart" + (l === 0 ? " · that's all of them" : "") + "</p>" : "") +
+      "</div>";
+  }
+  function buyLabel(p) {
+    if (!dropOpen()) return "Drop closed";
+    if (p.stock === 0) return "Sold out";
+    if (inCart(p.id) >= maxQty(p)) return "Max in cart";
+    return "Buy " + p.name + " · " + eur(p.price);
   }
   function totals() {
     var subtotal = cart.reduce(function (s, l) { return s + findProduct(l.id).price * l.qty; }, 0);
@@ -96,10 +177,10 @@
     return (
       '<article class="card" style="--c:' + p.swatch + '">' +
       '<a class="card-img" href="#/product/' + p.id + '">' + capImg(p, "", true) + "</a>" +
-      '<p class="stock"><span class="dot"></span>In stock · Limited drop</p>' +
+      stockLine(p) +
       '<div class="card-head"><h3><a href="#/product/' + p.id + '">' + esc(p.name) + '</a></h3><span class="price">' + eur(p.price) + "</span></div>" +
       '<p class="card-desc">' + esc(p.description) + "</p>" +
-      '<button type="button" class="btn block" data-buy="' + p.id + '">Buy ' + esc(p.name) + " · " + eur(p.price) + "</button>" +
+      '<button type="button" class="btn block" data-buy="' + p.id + '"' + (buyLabel(p).indexOf("Buy") ? " disabled" : "") + ">" + esc(buyLabel(p)) + "</button>" +
       "</article>"
     );
   }
@@ -114,9 +195,10 @@
       '<p class="eyebrow">Embroidered caps · Yellow, green, red</p>' +
       "<h1>Lithuania is already great.</h1>" +
       "<p class=\"lead\">No promises, no campaign. Just a cap for people who already know it, from the Baltic coast to the panel blocks, in every corner of the country.</p>" +
-      '<div class="hero-actions"><a class="btn" href="#/caps"><span class="dot"></span>Shop Drop 01</a><a class="btn btn-outline" href="#/about">Our story</a></div>' +
+      '<div class="hero-actions"><a class="btn" href="#/caps"><span class="dot live"></span>Shop ' + esc(SHOP.drop.name) + "</a>" + '<a class="btn btn-outline" href="#/about">Our story</a></div>' +
+      '<p class="live-line"><span class="dot live"></span><strong>' + esc(SHOP.drop.name) + ' is live</strong> · closes in <span data-cd-inline></span></p>' +
       "</div>" +
-      '<div class="hero-card">' +
+      '<div class="hero-card"><span class="pill pill-live"><span class="dot live"></span>Live now</span>' +
       '<a class="hero-img" id="hero-link" href="#/product/' + first.id + '">' + capImg(first, "", false).replace('loading="lazy"', 'loading="eager" id="hero-img"') + "</a>" +
       '<p class="hero-name" id="hero-name">' + esc(first.name + " · " + first.color) + "</p>" +
       swatches(first.id, false) +
@@ -131,9 +213,10 @@
       "</div></div></section>" +
 
       '<section class="drop" id="caps"><div class="wrap">' +
-      '<div class="drop-head"><div><span class="pill"><span class="dot"></span>Live now</span>' +
+      '<div class="drop-head"><div><span class="pill pill-live"><span class="dot live"></span>Live now</span>' +
       '<h2>Drop 01 is <span class="green">live</span></h2>' +
-      '<p class="scarcity">Limited run per color. When they\'re gone, they\'re gone.</p></div>' +
+      '<p class="scarcity">Only ' + PRODUCTS[0].stockTotal + ' caps per color. When they\'re gone, they\'re gone.</p>' +
+      '<p class="closes">' + esc(SHOP.drop.name) + " closes in</p>" + countdownBoxes() + "</div>" +
       '<div class="drop-meta"><p>Raised white embroidery on the front and sides · Flat brim · Adjustable snapback. Every cap carries the same message.</p>' +
       "<p><strong>" + eur(PRODUCTS[0].price) + " each · " + esc(SHOP.bundle.label) + '</strong></p><button type="button" class="btn btn-outline btn-sm" data-bundle>Buy all three · ' + eur(SHOP.bundle.price) + "</button></div></div>" +
       '<div class="grid">' + PRODUCTS.map(productCard).join("") + "</div>" +
@@ -169,14 +252,15 @@
       '<section class="product" style="--c:' + p.swatch + '">' +
       '<div class="product-img">' + capImg(p, "", false).replace('loading="lazy"', 'loading="eager"') + "</div>" +
       '<div class="product-info">' +
-      '<p class="stock"><span class="dot"></span>In stock · Limited drop</p>' +
+      stockLine(p) +
       "<h1>" + esc(p.name) + ' <span class="muted-h">· ' + esc(p.color) + "</span></h1>" +
       '<p class="price big">' + eur(p.price) + "</p>" +
       "<p>" + esc(p.description) + "</p>" +
       swatches(p.id, true) +
       '<form id="add-form" class="add-form">' +
-      '<label class="qty-label">Quantity <input type="number" name="qty" min="1" max="20" value="1"></label>' +
-      '<button class="btn" type="submit">Add to cart · ' + eur(p.price) + "</button></form>" +
+      stepper("qty", 1, 1, Math.max(1, maxQty(p) - inCart(p.id))) +
+      '<button class="btn" type="submit" data-add="' + p.id + '"' + (buyLabel(p).indexOf("Buy") ? " disabled" : "") + ">" + (buyLabel(p).indexOf("Buy") ? esc(buyLabel(p)) : "Add to cart · " + eur(p.price)) + "</button></form>" +
+      '<p class="live-line small"><span class="dot live"></span>' + esc(SHOP.drop.name) + ' closes in <span data-cd-inline></span></p>' +
       '<p class="bundle-note">' + esc(SHOP.bundle.label) + ': add one of each color and the discount is applied in the cart.</p>' +
       '<ul class="details">' + SHOP.details.map(function (d) { return "<li>" + esc(d) + "</li>"; }).join("") + "</ul>" +
       "</div></section></div>"
@@ -187,32 +271,134 @@
     if (!cart.length) {
       return '<div class="wrap page"><section class="empty"><h1>Your cart is empty</h1><p>Every head deserves a cap that says it. Pick a color.</p><a class="btn" href="#/caps">Shop Drop 01</a></section></div>';
     }
-    var rows = cart.map(function (l, i) {
-      var p = findProduct(l.id);
-      return (
-        '<li class="line">' +
-        '<a class="line-img" href="#/product/' + p.id + '">' + capImg(p, "", true) + "</a>" +
-        '<div class="line-info"><a href="#/product/' + p.id + '"><strong>' + esc(p.name) + "</strong></a>" +
-        '<span class="muted">' + esc(p.color) + " · " + eur(p.price) + " each</span></div>" +
-        '<div class="line-qty"><button type="button" data-dec="' + i + '" aria-label="Decrease quantity">−</button>' +
-        "<span>" + l.qty + "</span>" +
-        '<button type="button" data-inc="' + i + '" aria-label="Increase quantity">+</button></div>' +
-        '<div class="line-total">' + eur(p.price * l.qty) + "</div>" +
-        '<button type="button" class="link" data-remove="' + i + '">Remove</button></li>'
-      );
-    }).join("");
+    var rows = cart.map(cartLine).join("");
     var t = totals();
     var missing = PRODUCTS.filter(function (p) { return !cart.some(function (l) { return l.id === p.id; }); });
-    var nudge = !t.sets && missing.length && missing.length < PRODUCTS.length
-      ? '<p class="muted small">Add ' + missing.map(function (p) { return esc(p.name); }).join(" and ") + " to get all three for " + eur(SHOP.bundle.price) + ".</p>"
-      : "";
+    var nudge = bundleNudge();
     return (
-      '<div class="wrap page"><h1>Your cart</h1>' +
+      '<div class="wrap page"><h1>Your cart <span class="muted-h">(' + cartCount() + ")</span></h1>" +
       '<div class="cart-layout"><ul class="lines">' + rows + "</ul>" +
       '<aside class="panel summary"><h2>Summary</h2>' + summaryRows(t) + nudge +
-      '<a class="btn block" href="#/checkout">Checkout</a>' +
-      '<button type="button" class="link" id="clear-cart">Empty cart</button></aside></div></div>'
+      '<a class="btn block" href="#/checkout">Checkout · ' + eur(t.total) + "</a>" +
+      '<a class="btn btn-outline block" href="#/caps">Continue shopping</a>' +
+      '<button type="button" class="link" data-clear>Empty cart</button></aside></div></div>'
     );
+  }
+
+  function stepper(name, value, min, max, id) {
+    var attr = id ? ' data-line="' + id + '"' : "";
+    return '<div class="stepper"' + attr + '>' +
+      '<button type="button" data-step="-1" aria-label="Decrease quantity"' + (value <= min ? " disabled" : "") + ">−</button>" +
+      '<input type="number" name="' + name + '" value="' + value + '" min="' + min + '" max="' + max + '" inputmode="numeric" aria-label="Quantity">' +
+      '<button type="button" data-step="1" aria-label="Increase quantity"' + (value >= max ? " disabled" : "") + ">+</button></div>";
+  }
+
+  function cartLine(l) {
+    var p = findProduct(l.id);
+    var max = maxQty(p);
+    return (
+      '<li class="line" data-id="' + p.id + '">' +
+      '<a class="line-img" href="#/product/' + p.id + '">' + capImg(p, "", true) + "</a>" +
+      '<div class="line-info"><a href="#/product/' + p.id + '"><strong>' + esc(p.name) + "</strong></a>" +
+      '<span class="muted">' + esc(p.color) + " · " + eur(p.price) + " each</span>" +
+      (l.qty >= max ? '<span class="small warn">Max ' + max + " per order</span>" : "") + "</div>" +
+      stepper("line-" + p.id, l.qty, 0, max, p.id) +
+      '<div class="line-total">' + eur(p.price * l.qty) + "</div>" +
+      '<button type="button" class="icon-btn" data-remove="' + p.id + '" aria-label="Remove ' + esc(p.name) + '">' +
+      '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm-3 6h12l-1 12H7L6 9zm4 2v8h2v-8h-2zm4 0v8h2v-8h-2z"/></svg></button></li>'
+    );
+  }
+
+  function bundleNudge() {
+    var t = totals();
+    var missing = PRODUCTS.filter(function (p) { return !inCart(p.id) && p.stock > 0; });
+    if (t.sets || !missing.length || missing.length === PRODUCTS.length || !dropOpen()) return "";
+    return '<div class="nudge"><p>Add ' + missing.map(function (p) { return esc(p.name); }).join(" and ") +
+      " and get all three for " + eur(SHOP.bundle.price) + ".</p>" +
+      missing.map(function (p) { return '<button type="button" class="btn btn-outline btn-sm" data-buy="' + p.id + '">+ ' + esc(p.name) + "</button>"; }).join("") + "</div>";
+  }
+
+  function shippingProgress() {
+    var t = totals();
+    var after = t.subtotal - t.discount;
+    if (!after) return "";
+    var pct = Math.min(100, Math.round(100 * after / SHOP.shipping.freeFrom));
+    return '<div class="ship"><p>' + (t.shipping ? "You're " + eur(SHOP.shipping.freeFrom - after) + " away from free shipping" : "You've unlocked free shipping") + '</p><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+  }
+
+  // ---------- cart drawer ----------
+  var drawer = document.getElementById("drawer");
+  var drawerBody = document.getElementById("drawer-body");
+  var lastFocus = null;
+  function renderDrawer() {
+    document.getElementById("drawer-count").textContent = cartCount();
+    if (!cart.length) {
+      drawerBody.innerHTML = '<div class="drawer-empty"><p><strong>Your cart is empty.</strong></p><p class="muted">Pick a color while the drop is live.</p>' +
+        '<div class="mini-picks">' + PRODUCTS.map(function (p) {
+          return '<a href="#/product/' + p.id + '" data-close>' + capImg(p, "", true) + "<span>" + esc(p.name) + "</span></a>";
+        }).join("") + "</div>" +
+        '<a class="btn block" href="#/caps" data-close>Shop ' + esc(SHOP.drop.name) + "</a></div>";
+      return;
+    }
+    var t = totals();
+    drawerBody.innerHTML = shippingProgress() + '<ul class="lines">' + cart.map(cartLine).join("") + "</ul>" + bundleNudge() +
+      '<div class="drawer-foot">' + summaryRows(t) +
+      '<a class="btn block" href="#/checkout" data-close>Checkout · ' + eur(t.total) + "</a>" +
+      '<div class="drawer-links"><a href="#/cart" data-close>View cart</a><button type="button" class="link" data-close>Continue shopping</button></div></div>';
+  }
+  function openDrawer() {
+    lastFocus = document.activeElement;
+    renderDrawer();
+    drawer.hidden = false;
+    requestAnimationFrame(function () { drawer.classList.add("open"); });
+    document.body.classList.add("no-scroll");
+    document.getElementById("drawer-close").focus();
+  }
+  function closeDrawer() {
+    if (drawer.hidden) return;
+    drawer.classList.remove("open");
+    document.body.classList.remove("no-scroll");
+    setTimeout(function () { drawer.hidden = true; }, 250);
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+
+  // Everything that shows cart or stock state is redrawn from here.
+  function refresh() {
+    var n = cartCount();
+    countEl.textContent = n;
+    countEl.classList.toggle("has-items", n > 0);
+    if (!drawer.hidden) renderDrawer();
+    var page = (location.hash.replace(/^#\/?/, "").split("/")[0]) || "home";
+    if (page === "cart") app.innerHTML = viewCart();
+    if (page === "checkout" && !cart.length) app.innerHTML = viewCart();
+    document.querySelectorAll("[data-stock]").forEach(function (el) {
+      el.outerHTML = stockLine(findProduct(el.getAttribute("data-stock")));
+    });
+    document.querySelectorAll("[data-buy]").forEach(function (b) {
+      if (b.closest(".nudge")) return;
+      var p = findProduct(b.getAttribute("data-buy"));
+      b.textContent = buyLabel(p);
+      b.disabled = buyLabel(p).indexOf("Buy") !== 0;
+    });
+    var add = document.querySelector("[data-add]");
+    if (add) {
+      var ap = findProduct(add.getAttribute("data-add"));
+      var ok = buyLabel(ap).indexOf("Buy") === 0;
+      add.disabled = !ok;
+      add.textContent = ok ? "Add to cart · " + eur(ap.price) : buyLabel(ap);
+      var qi = document.querySelector('#add-form input[name="qty"]');
+      var room = Math.max(1, maxQty(ap) - inCart(ap.id));
+      qi.max = room;
+      if (+qi.value > room) qi.value = room;
+      syncStepper(qi.closest(".stepper"));
+    }
+    var bundle = document.querySelector("[data-bundle]");
+    if (bundle) bundle.disabled = !dropOpen() || PRODUCTS.some(function (p) { return inCart(p.id) >= maxQty(p); });
+  }
+  function syncStepper(st) {
+    var i = st.querySelector("input");
+    st.querySelector('[data-step="-1"]').disabled = +i.value <= +i.min;
+    st.querySelector('[data-step="1"]').disabled = +i.value >= +i.max;
   }
 
   function summaryRows(t) {
@@ -236,7 +422,8 @@
       '<label>Postal code<input name="zip" required autocomplete="postal-code"></label></div>' +
       '<label>Country<select name="country"><option>Lithuania</option><option>Latvia</option><option>Estonia</option><option>Poland</option><option>Germany</option><option>Netherlands</option><option>Other EU country</option></select></label>' +
       '<p class="error" id="form-error" role="alert"></p>' +
-      '<button class="btn block" type="submit">Place demo order · ' + eur(t.total) + "</button></form>" +
+      '<button class="btn block" type="submit">Place demo order · ' + eur(t.total) + "</button>" +
+      '<a class="link back" href="#/cart">← Back to cart</a></form>' +
       '<aside class="panel summary"><h2>Order</h2><ul class="mini">' +
       cart.map(function (l) {
         var p = findProduct(l.id);
@@ -270,7 +457,7 @@
     if (page === "home" || section) {
       // Sections live on the home page; only re-render when coming from another page.
       var wasHome = lastPage === "home";
-      if (!wasHome) { app.innerHTML = viewHome(); bindHome(); }
+      if (!wasHome) { app.innerHTML = viewHome(); bindHome(); tick(); }
       lastPage = "home";
       setActive(section || "");
       document.title = title;
@@ -297,6 +484,7 @@
     setActive(page === "product" ? "caps" : page === "checkout" ? "cart" : page);
     window.scrollTo(0, 0);
     bindPage(page, parts);
+    tick();
   }
 
   function setActive(key) {
@@ -340,9 +528,10 @@
       var form = document.getElementById("add-form");
       if (form) form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var qty = Math.max(1, Math.min(20, parseInt(form.qty.value, 10) || 1));
-        addToCart(parts[1], qty);
-        toast("Added " + qty + " × " + findProduct(parts[1]).name + " to cart");
+        var qty = Math.max(1, parseInt(form.qty.value, 10) || 1);
+        var added = addToCart(parts[1], qty);
+        if (added) { form.qty.value = 1; refresh(); openDrawer(); }
+        else toast("You already have the maximum of this cap in your cart");
       });
     }
     if (page === "checkout") {
@@ -354,6 +543,8 @@
         if (missing.length) { err.textContent = "Please fill in all fields."; missing[0].focus(); return; }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cf.email.value.trim())) { err.textContent = "Please enter a valid email address."; cf.email.focus(); return; }
         var ref = "LIAG-" + Date.now().toString(36).toUpperCase();
+        // Demo: reflect the purchase in this visitor's stock numbers.
+        cart.forEach(function (l) { findProduct(l.id).stock -= l.qty; });
         cart = [];
         saveCart();
         location.hash = "#/thanks/" + ref;
@@ -361,32 +552,78 @@
     }
   }
 
-  // Delegated clicks: buy buttons, bundle, cart controls.
-  app.addEventListener("click", function (e) {
-    var t = e.target.closest("button");
+  // Delegated clicks for buy buttons and cart controls, wherever they are (page or drawer).
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("button, a");
     if (!t) return;
     var id;
+    if (t.classList.contains("cart-link")) {
+      e.preventDefault();
+      openDrawer();
+      return;
+    }
+    if (t.hasAttribute("data-close")) {
+      closeDrawer();
+      return;
+    }
     if ((id = t.getAttribute("data-buy"))) {
-      addToCart(id, 1);
-      toast("Added " + findProduct(id).name + " to cart");
+      if (addToCart(id, 1)) openDrawer();
+      else toast("You already have the maximum of " + findProduct(id).name + " in your cart");
       return;
     }
     if (t.hasAttribute("data-bundle")) {
-      PRODUCTS.forEach(function (p) { addToCart(p.id, 1); });
-      toast("Added all three caps · " + SHOP.bundle.label);
+      var n = 0;
+      PRODUCTS.forEach(function (p) { n += addToCart(p.id, 1); });
+      if (n) openDrawer();
       return;
     }
-    var i;
-    if ((i = t.getAttribute("data-inc")) !== null) cart[i].qty = Math.min(cart[i].qty + 1, 20);
-    else if ((i = t.getAttribute("data-dec")) !== null) {
-      cart[i].qty -= 1;
-      if (cart[i].qty < 1) cart.splice(i, 1);
-    } else if ((i = t.getAttribute("data-remove")) !== null) cart.splice(i, 1);
-    else if (t.id === "clear-cart") cart = [];
-    else return;
-    saveCart();
-    app.innerHTML = viewCart();
+    if ((id = t.getAttribute("data-remove"))) { removeLine(id); return; }
+    if (t.hasAttribute("data-clear")) {
+      var saved = cart.slice();
+      cart = [];
+      saveCart();
+      toast("Cart emptied", function () { cart = saved; saveCart(); });
+      return;
+    }
+    var step = t.getAttribute("data-step");
+    if (step) {
+      var st = t.closest(".stepper");
+      var input = st.querySelector("input");
+      var line = st.getAttribute("data-line");
+      var v = Math.max(+input.min, Math.min(+input.max, (parseInt(input.value, 10) || 0) + +step));
+      if (line) {
+        if (v === 0) removeLine(line);
+        else setQty(line, v);
+      } else {
+        input.value = v;
+        syncStepper(st);
+      }
+    }
   });
+
+  // Typing a quantity straight into a cart line.
+  document.addEventListener("change", function (e) {
+    var st = e.target.closest && e.target.closest(".stepper");
+    if (!st) return;
+    var input = st.querySelector("input");
+    var v = Math.max(+input.min, Math.min(+input.max, parseInt(input.value, 10) || 0));
+    var line = st.getAttribute("data-line");
+    if (line) {
+      if (v === 0) removeLine(line);
+      else setQty(line, v);
+    } else {
+      input.value = Math.max(1, v);
+      syncStepper(st);
+    }
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeDrawer();
+  });
+  drawer.addEventListener("click", function (e) {
+    if (e.target === drawer) closeDrawer();
+  });
+  document.getElementById("drawer-close").addEventListener("click", closeDrawer);
 
   // Re-clicking a link to the section you're on should still scroll to it.
   document.addEventListener("click", function (e) {
@@ -394,10 +631,12 @@
     if (a && a.getAttribute("href") === location.hash) route();
   });
 
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", function () { closeDrawer(); route(); });
   window.addEventListener("storage", function (e) {
-    if (e.key === CART_KEY) { cart = loadCart(); updateCount(); }
+    if (e.key === CART_KEY) { cart = loadCart(); refresh(); }
   });
-  updateCount();
   route();
+  refresh();
+  tick();
+  setInterval(tick, 1000);
 })();

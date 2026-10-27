@@ -2,6 +2,9 @@
 window.SHOP = {
   currency: "EUR",
   bundle: { price: 75, label: "All three for €75" },
+  // The live drop. The countdown runs until endsAt; after that, buying is closed.
+  drop: { name: "Drop 01", endsAt: "2026-11-30T21:59:00Z" },
+  maxPerOrder: 10,
   shipping: { flat: 4.9, freeFrom: 50 },
   details: [
     "Raised white embroidery on the front and sides",
@@ -14,6 +17,8 @@ window.SHOP = {
 window.PRODUCTS = [
   {
     id: "sun",
+    stock: 38, // caps left in this drop: update to your real numbers
+    stockTotal: 50,
     name: "Sun",
     color: "Yellow",
     swatch: "#F5B800",
@@ -25,6 +30,8 @@ window.PRODUCTS = [
   },
   {
     id: "hope",
+    stock: 44, // caps left in this drop: update to your real numbers
+    stockTotal: 50,
     name: "Hope",
     color: "Green",
     swatch: "#0B6B3A",
@@ -36,6 +43,8 @@ window.PRODUCTS = [
   },
   {
     id: "courage",
+    stock: 27, // caps left in this drop: update to your real numbers
+    stockTotal: 50,
     name: "Courage",
     color: "Red",
     swatch: "#C8202F",

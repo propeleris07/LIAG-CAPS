@@ -1,4 +1,4 @@
-// Smoke test for the storefront: navigation, product pages, cart, demo checkout.
+// Smoke test for the storefront: live drop, navigation, product pages, cart drawer, cart page, demo checkout.
 // Usage: node tests/smoke.js <site-url>
 const { chromium } = require("playwright");
 const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
@@ -13,11 +13,21 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
     console.log((cond ? "PASS " : "FAIL ") + msg);
     if (!cond) process.exitCode = 1;
   };
+  const count = () => page.textContent("#cart-count");
+  const drawerOpen = () => page.evaluate(() => !document.getElementById("drawer").hidden);
+  const closeDrawer = async () => { await page.click("#drawer-close"); await page.waitForTimeout(300); };
+  const summary = () => page.textContent(".drawer-foot");
 
+  // ---- home and live drop ----
   await page.goto(BASE);
   await page.waitForSelector(".hero");
   check((await page.title()) === "Lithuania is Already Great", "home page loads");
   check(await page.evaluate(() => [...document.images].every((i) => i.complete && i.naturalWidth > 0)), "hero cap photo loads");
+  check(await page.evaluate(() => getComputedStyle(document.querySelector(".dot.live"), "::after").animationName === "pulse"), "live dot pulses");
+  const t1 = await page.textContent("[data-cd-inline]");
+  await page.waitForTimeout(1200);
+  const t2 = await page.textContent("[data-cd-inline]");
+  check(/\d+d \d\d:\d\d:\d\d/.test(t1) && t1 !== t2, `countdown ticks (${t1} → ${t2})`);
 
   await page.click('[data-swatch="hope"]');
   check((await page.textContent("#hero-name")).includes("Hope"), "hero colour switcher works");
@@ -27,16 +37,66 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
   check((await page.$$("#caps .card")).length === 3, "drop shows 3 caps");
   check(await page.evaluate(() => document.getElementById("caps").getBoundingClientRect().top < 200), "Caps link scrolls to the drop");
   check(await page.evaluate(() => [...document.querySelectorAll("#caps img")].every((i) => i.complete && i.naturalWidth > 0)), "product photos load");
+  check((await page.$$("#caps .countdown [data-cd]")).length === 4, "drop countdown shown");
+  check((await page.textContent('[data-stock="courage"]')).includes("27"), "stock left shown per cap");
 
-  await page.click('[data-buy="sun"]');
-  check((await page.textContent("#cart-count")) === "1", "Buy button adds to cart");
+  // ---- buy opens drawer; +/−; remove + undo ----
+  await page.click('#caps [data-buy="sun"]');
+  await page.waitForTimeout(300);
+  check(await drawerOpen(), "Buy opens the cart drawer");
+  check((await count()) === "1", "cart count = 1");
+  await page.click('#drawer [data-line="sun"] [data-step="1"]');
+  check((await count()) === "2", "drawer + increases quantity");
+  check((await page.inputValue('#drawer [data-line="sun"] input')) === "2", "drawer shows new quantity");
+  await page.click('#drawer [data-line="sun"] [data-step="-1"]');
+  check((await count()) === "1", "drawer − decreases quantity");
+  await page.fill('#drawer [data-line="sun"] input', "4");
+  await page.press('#drawer [data-line="sun"] input', "Tab");
+  check((await count()) === "4", "typing a quantity updates the cart");
+  check((await page.textContent('[data-stock="sun"]')).includes("4 in your cart"), "card shows how many are in your cart");
+  await page.click('#drawer [data-remove="sun"]');
+  check((await count()) === "0", "remove button deletes the item");
+  check((await page.textContent("#drawer-body")).includes("Your cart is empty"), "empty cart state shown");
+  await page.click(".toast-undo");
+  check((await count()) === "4", "undo restores the removed item");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check(!(await drawerOpen()), "Escape closes the drawer");
 
+  // ---- stock / per-order limits ----
+  await page.click(".cart-link");
+  await page.waitForTimeout(300);
+  check(await drawerOpen(), "header cart button opens the drawer");
+  await page.fill('#drawer [data-line="sun"] input', "99");
+  await page.press('#drawer [data-line="sun"] input', "Tab");
+  check((await count()) === "10", "quantity capped at 10 per order");
+  check(await page.isDisabled('#drawer [data-line="sun"] [data-step="1"]'), "+ disabled at the limit");
+  await closeDrawer();
+  check(await page.isDisabled('#caps [data-buy="sun"]'), "Buy button disabled when max is in cart");
+  await page.click(".cart-link");
+  await page.waitForTimeout(300);
+  await page.fill('#drawer [data-line="sun"] input', "1");
+  await page.press('#drawer [data-line="sun"] input', "Tab");
+
+  // ---- bundle nudge in drawer ----
+  check((await page.textContent("#drawer-body")).includes("get all three"), "drawer suggests the bundle");
+  await page.click('#drawer .nudge [data-buy="hope"]');
+  await page.click('#drawer .nudge [data-buy="courage"]');
+  const s1 = await summary();
+  check(s1.includes("−€12") && s1.includes("€75"), "bundle: one of each = €75");
+  await closeDrawer();
+
+  // ---- product page ----
   await page.click('#caps .card h3 a[href="#/product/courage"]');
   await page.waitForSelector("#add-form");
   check((await page.textContent("h1")).includes("Courage"), "product page opens");
-  await page.fill("input[name=qty]", "2");
-  await page.click("#add-form button");
-  check((await page.textContent("#cart-count")) === "3", "add to cart with quantity");
+  await page.click('#add-form [data-step="1"]');
+  check((await page.inputValue('#add-form input[name="qty"]')) === "2", "product quantity stepper works");
+  await page.click("[data-add]");
+  await page.waitForTimeout(300);
+  check(await drawerOpen(), "Add to cart opens the drawer");
+  check((await count()) === "5", "add to cart with quantity (1 Sun, 1 Hope, 3 Courage)");
+  await closeDrawer();
   await page.click('.swatch[href="#/product/hope"]');
   await page.waitForFunction(() => document.querySelector("h1").textContent.includes("Hope"));
   check(true, "colour swatch links to the other cap");
@@ -47,23 +107,25 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
     check(await page.evaluate((s) => Math.abs(document.getElementById(s).getBoundingClientRect().top) < 200, id), `${link} link scrolls to its section`);
   }
 
-  await page.click(".cart-link");
+  // ---- cart page ----
+  await page.goto(BASE + "#/cart");
   await page.waitForSelector(".line");
-  check((await page.textContent(".summary")).includes("€87"), "cart subtotal is €87 (1 Sun, 2 Courage)");
-  check(!(await page.textContent(".summary")).includes("Bundle"), "no bundle discount without all three");
-  await page.goto(BASE + "#/caps");
-  await page.click("[data-bundle]");
-  await page.click(".cart-link");
-  await page.waitForSelector(".line");
-  const summary = await page.textContent(".summary");
-  check(summary.includes("€174") && summary.includes("−€12") && summary.includes("€162"), "bundle: 2 Sun, 1 Hope, 3 Courage = €174 − €12 = €162");
-  await page.click('[data-dec="2"]');
-  check((await page.textContent("#cart-count")) === "5", "quantity − works");
+  const cartText = await page.textContent(".summary");
+  check(cartText.includes("€145") && cartText.includes("−€12") && cartText.includes("€133"), "cart page: €145 − €12 = €133");
+  await page.click('.page [data-line="courage"] [data-step="-1"]');
+  check((await count()) === "4", "cart page − works");
+  await page.click('.page [data-remove="hope"]');
+  check((await count()) === "3" && !(await page.$('.page [data-line="hope"]')), "cart page remove works");
   await page.reload();
   await page.waitForSelector(".line");
-  check((await page.textContent("#cart-count")) === "5", "cart survives reload");
+  check((await count()) === "3", "cart survives reload");
+  await page.click(".page [data-clear]");
+  check((await count()) === "0" && (await page.textContent("h1")).includes("empty"), "empty cart button works");
+  await page.click(".toast-undo");
+  check((await count()) === "3", "undo after emptying the cart");
 
-  await page.click('a[href="#/checkout"]');
+  // ---- checkout ----
+  await page.click('.page a[href="#/checkout"]');
   await page.waitForSelector("#checkout-form");
   await page.click("#checkout-form button[type=submit]");
   check((await page.textContent("#form-error")).length > 0, "checkout validates empty form");
@@ -74,7 +136,7 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
   await page.fill("[name=zip]", "01103");
   await page.click("#checkout-form button[type=submit]");
   await page.waitForSelector("text=Demo order received");
-  check((await page.textContent("#cart-count")) === "0", "demo order clears the cart");
+  check((await count()) === "0", "demo order clears the cart");
 
   await page.goto(BASE + "#/contact");
   await page.waitForSelector("#contact-form");
@@ -92,10 +154,14 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
     check((await page.textContent("h1")).includes("not found"), "404 redirects back into the store");
   }
 
+  // ---- layout ----
+  await page.goto(BASE + "#/");
+  await page.evaluate(() => localStorage.setItem("liag-cart-v2", JSON.stringify([{ id: "sun", qty: 2 }, { id: "hope", qty: 1 }])));
   for (const width of [375, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     for (const r of ["#/", "#/caps", "#/product/sun", "#/cart", "#/checkout"]) {
       await page.goto(BASE + r);
+      await page.reload();
       await page.waitForTimeout(150);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       check(overflow <= 0, `no horizontal scroll at ${width}px on ${r}`);

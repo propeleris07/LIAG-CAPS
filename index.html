@@ -50,6 +50,16 @@
     <p class="copyright">© <span id="year"></span> Lithuania Is Already Great</p>
   </footer>
 
+  <div class="drawer" id="drawer" hidden>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <header class="drawer-head">
+        <h2 id="drawer-title">Your cart <span class="muted-h">(<span id="drawer-count">0</span>)</span></h2>
+        <button type="button" class="icon-btn" id="drawer-close" aria-label="Close cart">✕</button>
+      </header>
+      <div class="drawer-body" id="drawer-body"></div>
+    </aside>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="js/products.js"></script>
