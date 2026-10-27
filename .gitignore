@@ -1,0 +1,28 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Secrets and private config: never commit these
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*.json
+
+# Business data that should stay private
+*.xlsx
+*.xls
+*.csv
+orders/
+customers/
+
+# Tooling (if a build step is added later)
+node_modules/
+dist/
+.cache/
+npm-debug.log*

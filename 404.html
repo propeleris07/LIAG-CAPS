@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found · Lithuania is Already Great</title>
+  <script>
+    // Unknown paths go back to the storefront. Project sites live under /<repo>/.
+    var seg = location.pathname.split("/").filter(Boolean)[0];
+    var base = location.hostname.endsWith("github.io") && seg ? "/" + seg + "/" : "/";
+    location.replace(base + "#/404");
+  </script>
+</head>
+<body style="font-family:sans-serif;padding:24px">
+  <p>Page not found. <a href="/">Go to the store</a>.</p>
+</body>
+</html>
