@@ -62,8 +62,10 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
   check((await page.textContent("h1")).includes("not found"), "unknown product shows not-found page");
 
   if (!BASE.includes("localhost")) {
+    const before = errors.length;
     await page.goto(BASE + "some/missing/page");
     await page.waitForSelector("h1");
+    errors.length = before; // the 404 response itself is logged as a console error; that is expected here
     check((await page.textContent("h1")).includes("not found"), "404 redirects back into the store");
   }
 
