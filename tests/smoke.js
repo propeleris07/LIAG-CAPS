@@ -105,7 +105,7 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
     await page.click(`header nav >> text=${link}`);
     // Smooth scrolling can take a moment on slow machines; wait for it to land.
     const landed = await page
-      .waitForFunction((s) => Math.abs(document.getElementById(s).getBoundingClientRect().top) < 200, id, { timeout: 4000 })
+      .waitForFunction((s) => { const el = document.getElementById(s); return !!el && Math.abs(el.getBoundingClientRect().top) < 200; }, id, { timeout: 4000 })
       .then(() => true, () => false);
     check(landed, `${link} link scrolls to its section`);
   }
