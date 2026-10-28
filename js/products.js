@@ -1,17 +1,12 @@
-// Product catalogue. Edit this file to change caps, prices or descriptions.
+// Product catalogue. Edit this file to change caps, prices, stock or descriptions.
+// Lithuanian names and descriptions, and all other site text, are in i18n.js.
 window.SHOP = {
   currency: "EUR",
-  bundle: { price: 75, label: "All three for €75" },
+  bundle: { price: 75 }, // price for one of each colour
   // The live drop. The countdown runs until endsAt; after that, buying is closed.
   drop: { name: "Drop 01", endsAt: "2026-11-30T21:59:00Z" },
   maxPerOrder: 10,
-  shipping: { flat: 4.9, freeFrom: 50 },
-  details: [
-    "Raised white embroidery on the front and sides",
-    "Flat brim, structured five-panel crown",
-    "Adjustable snapback, one size fits most",
-    "Limited Drop 01 run"
-  ]
+  shipping: { flat: 4.9, freeFrom: 50 }
 };
 
 window.PRODUCTS = [

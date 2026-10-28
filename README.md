@@ -15,7 +15,8 @@ Plain HTML, CSS and JavaScript. There are no dependencies and no build step. The
 index.html          Page shell (header, nav, footer)
 404.html            Sends unknown URLs back to the store
 css/style.css       All styling (Anton + Inter fonts from Google Fonts), mobile-friendly
-js/products.js      The three caps (Sun, Hope, Courage), prices, bundle price, shipping rates
+js/products.js      The three caps (Sun, Hope, Courage), prices, stock, bundle price, shipping rates
+js/i18n.js          All site text in English and Lithuanian (EN | LT switch in the header)
 js/app.js           Router, cart with bundle discount, demo checkout, contact form
 assets/img/         Cap photos and panel-block photos
 tests/smoke.js      Browser test run against the live site after every deploy
@@ -28,6 +29,8 @@ Pages use hash URLs (`#/caps`, `#/product/sun`, `#/cart`), so everything works o
 
 **Cart:** adding a cap opens a slide-out cart with +/− quantity, typed quantities, remove (with Undo), a free-shipping progress bar and a one-click bundle suggestion. The full cart page is at `#/cart`.
 
+**Languages:** the EN | LT switch in the header changes all text, cap names (Saulė, Viltis, Drąsa), prices and the countdown. The choice is remembered in the visitor's browser; first-time visitors with a Lithuanian browser get Lithuanian. To change wording, edit `js/i18n.js` (the `en` and `lt` blocks have the same keys). The slogan stays in English in both languages.
+
 **Pricing:** €29 per cap. Every complete set of all three colours in the cart is charged €75 (a €12 discount). Shipping is a flat €4.90, free from €50. Change these in `js/products.js`.
 
 ## Run locally
@@ -39,7 +42,7 @@ python3 -m http.server 8000
 
 ## Edit products
 
-Open `js/products.js`. Each cap has an `id` (used in the URL), `name`, `color`, `swatch` colour, `price` in EUR, a full-size `image`, a smaller `thumb` and a `description`. Drop new photos into `assets/img/` and point the entries at them.
+Open `js/products.js` (Lithuanian names and descriptions are in `js/i18n.js` under `products`). Each cap has an `id` (used in the URL), `name`, `color`, `swatch` colour, `price` in EUR, a full-size `image`, a smaller `thumb` and a `description`. Drop new photos into `assets/img/` and point the entries at them.
 
 ## Still to fill in
 

@@ -161,7 +161,31 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
     check((await page.textContent("h1")).includes("not found"), "404 redirects back into the store");
   }
 
-  // ---- layout ----
+  // ---- language switch ----
+  await page.goto(BASE + "#/caps");
+  await page.waitForSelector("#caps .card");
+  await page.click('[data-lang="lt"]');
+  await page.waitForTimeout(300);
+  check((await page.getAttribute("html", "lang")) === "lt", "LT button switches the page language");
+  check((await page.textContent('header [data-nav="caps"]')).includes("Kepurės"), "header is in Lithuanian");
+  check((await page.textContent('#caps [data-buy="sun"]')).includes("Pirkti Saulę"), "cap names and buttons are in Lithuanian");
+  check((await page.textContent("#caps .scarcity")).includes("kepurių"), "drop section is in Lithuanian");
+  await page.click('#caps [data-buy="hope"]');
+  await page.waitForTimeout(300);
+  check((await page.textContent("#drawer")).includes("Tavo krepšelis") && (await page.textContent("#drawer")).includes("Apmokėti"), "cart drawer is in Lithuanian");
+  await closeDrawer();
+  await page.reload();
+  await page.waitForSelector("#caps .card");
+  check((await page.textContent('header [data-nav="caps"]')).includes("Kepurės"), "language choice is remembered after reload");
+  await page.goto(BASE + "#/checkout");
+  await page.waitForSelector("#checkout-form");
+  check((await page.textContent("h1")).includes("Apmokėjimas"), "checkout is in Lithuanian");
+  await page.click('[data-lang="en"]');
+  await page.waitForTimeout(300);
+  check((await page.textContent("h1")).includes("Checkout") && (await page.getAttribute("html", "lang")) === "en", "EN button switches back to English");
+  await page.evaluate(() => localStorage.removeItem("liag-cart-v2"));
+
+
   await page.goto(BASE + "#/");
   await page.evaluate(() => localStorage.setItem("liag-cart-v2", JSON.stringify([{ id: "sun", qty: 2 }, { id: "hope", qty: 1 }])));
   for (const width of [375, 1280]) {

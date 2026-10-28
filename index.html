@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="demo-banner" role="note">Demo store: checkout is simulated, no payments are taken and nothing ships yet.</div>
+  <div class="demo-banner" role="note" data-i18n="demoBanner">Demo store: checkout is simulated, no payments are taken and nothing ships yet.</div>
 
   <header class="site-header">
     <div class="wrap header-inner">
@@ -24,12 +24,16 @@
         <span>LIAG</span>
       </a>
       <nav class="nav" aria-label="Main">
-        <a href="#/about" data-nav="about">About</a>
-        <a href="#/caps" data-nav="caps">Caps</a>
-        <a href="#/story" data-nav="story">Our story</a>
-        <a href="#/contact" data-nav="contact">Contact</a>
-        <a href="#/cart" data-nav="cart" class="cart-link" aria-label="Cart">Cart <span class="cart-count" id="cart-count">0</span></a>
-        <a href="#/caps" class="btn btn-sm nav-cta">Shop the drop</a>
+        <a href="#/about" data-nav="about" data-i18n="navAbout">About</a>
+        <a href="#/caps" data-nav="caps" data-i18n="navCaps">Caps</a>
+        <a href="#/story" data-nav="story" data-i18n="navStory">Our story</a>
+        <a href="#/contact" data-nav="contact" data-i18n="navContact">Contact</a>
+        <a href="#/cart" data-nav="cart" class="cart-link"><span data-i18n="navCart">Cart</span> <span class="cart-count" id="cart-count">0</span></a>
+        <div class="lang" role="group" aria-label="Language" data-i18n-label="langLabel">
+          <button type="button" data-lang="en" lang="en" aria-label="English">EN</button>
+          <button type="button" data-lang="lt" lang="lt" aria-label="Lietuvių">LT</button>
+        </div>
+        <a href="#/caps" class="btn btn-sm nav-cta" data-i18n="navCta">Shop the drop</a>
       </nav>
     </div>
   </header>
@@ -41,10 +45,10 @@
     <div class="wrap footer-inner">
       <p class="footer-logo">Lithuania is Already Great.</p>
       <nav class="footer-nav" aria-label="Footer">
-        <a href="#/about">About</a>
-        <a href="#/caps">Caps</a>
-        <a href="#/story">Our story</a>
-        <a href="#/contact">Contact</a>
+        <a href="#/about" data-i18n="navAbout">About</a>
+        <a href="#/caps" data-i18n="navCaps">Caps</a>
+        <a href="#/story" data-i18n="navStory">Our story</a>
+        <a href="#/contact" data-i18n="navContact">Contact</a>
       </nav>
     </div>
     <p class="copyright">© <span id="year"></span> Lithuania Is Already Great</p>
@@ -53,8 +57,8 @@
   <div class="drawer" id="drawer" hidden>
     <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <header class="drawer-head">
-        <h2 id="drawer-title">Your cart <span class="muted-h">(<span id="drawer-count">0</span>)</span></h2>
-        <button type="button" class="icon-btn" id="drawer-close" aria-label="Close cart">✕</button>
+        <h2 id="drawer-title"><span data-i18n="cartTitle">Your cart</span> <span class="muted-h">(<span id="drawer-count">0</span>)</span></h2>
+        <button type="button" class="icon-btn" id="drawer-close" aria-label="Close cart" data-i18n-label="closeCart">✕</button>
       </header>
       <div class="drawer-body" id="drawer-body"></div>
     </aside>
@@ -63,6 +67,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="js/products.js"></script>
+  <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

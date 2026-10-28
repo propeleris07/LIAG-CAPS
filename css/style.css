@@ -311,3 +311,10 @@ textarea { resize: vertical; }
   .hero-card .pill-live { top: 26px; left: 26px; }
 }
 @media (prefers-reduced-motion: reduce) { .dot.live::after, .pill-live { animation: none; } }
+
+/* ---------- language switch ---------- */
+.lang { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; margin-left: 6px; background: var(--panel); }
+.lang button { border: 0; background: transparent; font: inherit; font-size: .75rem; font-weight: 700; letter-spacing: .06em; padding: 5px 9px; border-radius: 999px; cursor: pointer; color: var(--muted); }
+.lang button.active { background: var(--ink); color: #fff; }
+.lang button:not(.active):hover { color: var(--ink); }
+@media (max-width: 640px) { .lang { margin-left: 2px; } .lang button { padding: 4px 7px; } }
