@@ -81,7 +81,8 @@ main { outline: none; min-height: 60vh; }
 .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
 .hero-card { background: var(--panel); border-radius: 24px; padding: 18px 18px 22px; box-shadow: 0 20px 50px rgba(0,0,0,.12); text-align: center; }
 .hero-img { display: block; border-radius: 14px; overflow: hidden; background: #f1f1f1; }
-.hero-name { font-family: var(--display); font-size: 1.5rem; margin: 16px 0 10px; }
+/* Same style as the cap names in the catalog cards */
+.hero-name { font-family: var(--display); font-size: 1.9rem; line-height: 1.02; text-transform: uppercase; letter-spacing: .005em; margin: 16px 0 10px; }
 .swatches { display: flex; gap: 12px; justify-content: center; margin: 8px 0; }
 .swatch { width: 34px; height: 34px; border-radius: 50%; background: var(--c); border: 3px solid var(--panel); box-shadow: 0 0 0 2px transparent; cursor: pointer; padding: 0; transition: box-shadow .15s ease; }
 .swatch.active, .swatch:hover { box-shadow: 0 0 0 2px var(--ink); }
