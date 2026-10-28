@@ -22,7 +22,11 @@ const BASE = (process.argv[2] || "http://localhost:8000/").replace(/\/?$/, "/");
   await page.goto(BASE);
   await page.waitForSelector(".hero");
   check((await page.title()) === "Lithuania is Already Great", "home page loads");
-  check(await page.evaluate(() => [...document.images].every((i) => i.complete && i.naturalWidth > 0)), "hero cap photo loads");
+  // Only the hero photo: the catalog photos lower down load lazily and are checked later.
+  const heroLoaded = await page
+    .waitForFunction(() => { const i = document.getElementById("hero-img"); return i && i.complete && i.naturalWidth > 0; }, null, { timeout: 10000 })
+    .then(() => true, () => false);
+  check(heroLoaded, "hero cap photo loads");
   check(await page.evaluate(() => getComputedStyle(document.querySelector(".dot.live"), "::after").animationName === "pulse"), "live dot pulses");
   const t1 = await page.textContent("[data-cd-inline]");
   await page.waitForTimeout(1200);
